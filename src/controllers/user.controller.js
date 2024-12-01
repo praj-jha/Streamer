@@ -33,6 +33,14 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All fields are required")
     }
 
+   /* here this $or: [] is a way to find alot different fields at once but we couldve passed
+    it inside the findOne itself right ?
+    
+    
+    and answer to above question is that below $or:[] will find either username or email and if
+    any of the further logic executes but in findOne({ email, username}) this will look for both
+    username and email to match with the sent data but what is usrname matches and email doesnt
+    so there will be duplicate usernames */
 
     const existingUser = await User.findOne({
         $or: [{ username }, { email }]
@@ -69,6 +77,9 @@ const registerUser = asyncHandler(async (req, res) => {
 
     })
 
+    /* This .select has a syntax in which we pass the thing which are not required so lets say
+    fullname and username were also not req in the createdUser then we couldve written it like 
+    .select("-password -fullname -username") */
     const createdUser = await User.findById(user._id).select(
         "-password"
     )

@@ -64,8 +64,12 @@ userSchema.pre("save" , async function (next) {
     next()
 } )
 
+/* above pre in userschema so these are the hooks and plugins we defined for the User model and 
+its syntax is this way that we apply all these on userSchema but that doesnt mean userSchema is a class
+it indirectly applies on the instances of User model which is a class like const user = new User  */
 
-
+/* Same goes in below cases also we are now defining some meothods which will be used by the instances of User model class like if its user then we can user.isPasswordCorrect(password) then this.password will point
+to the user.password which is being sent by the user */
 
 userSchema.methods.isPasswordCorrect =  async function (password){
     return await bcrypt.compare(password,this.password)
