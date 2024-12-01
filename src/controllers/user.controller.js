@@ -11,8 +11,8 @@ const generateAccessAndRefreshToken = async function (userId) {
         const accessToken = user.generateAccessToken();
         const refreshToken = user.generateRefreshToken();
 
-        user.refreshToken = refreshToken;
-        await user.save({ validateBeforeSave: false })
+        user.refreshToken = refreshToken;  // we are storing this in our db because refresh token needs to stored
+        await user.save({ validateBeforeSave: false })  //and here we saved the data and turned the validations off because we did not send any password or something
 
         return { accessToken, refreshToken };
     } catch (error) {
@@ -26,6 +26,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const { fullname, email, username, password } = req.body
 
+    //check if the data sent is empty 
     if (
         [fullname, email, username, password].some((field) =>
             field?.trim() === "")
@@ -33,14 +34,14 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All fields are required")
     }
 
-   /* here this $or: [] is a way to find alot different fields at once but we couldve passed
-    it inside the findOne itself right ?
-    
-    
-    and answer to above question is that below $or:[] will find either username or email and if
-    any of the further logic executes but in findOne({ email, username}) this will look for both
-    username and email to match with the sent data but what is usrname matches and email doesnt
-    so there will be duplicate usernames */
+    /* here this $or: [] is a way to find alot different fields at once but we couldve passed
+     it inside the findOne itself right ?
+     
+     
+     and answer to above question is that below $or:[] will find either username or email and if
+     any of the further logic executes but in findOne({ email, username}) this will look for both
+     username and email to match with the sent data but what is usrname matches and email doesnt
+     so there will be duplicate usernames */
 
     const existingUser = await User.findOne({
         $or: [{ username }, { email }]
@@ -73,7 +74,7 @@ const registerUser = asyncHandler(async (req, res) => {
         avatar: avatar.url,
         coverImage: coverImage?.url || "", //if coverImage exists then take its url otherwise we set it empty
         email,
-        password,
+        password,  //here the password automatically gets hashed before being saved coz of the pre hook we added in the usermodel
 
     })
 
@@ -96,7 +97,7 @@ const registerUser = asyncHandler(async (req, res) => {
 })
 
 const loginUser = asyncHandler(async (req, res) => {
-   
+
     const { email, username, password } = req.body;
     if (!username && !email) {
         throw new ApiError(400, "username or email is required")
@@ -118,8 +119,9 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
-    const loggedInUser = User.findById(user._id);
+    const loggedInUser = User.findById(user._id).select("-password -refreshToken");
 
+    //this needs to added coz after then the cookie can only be changed by the server side not by the user
     const options = {
         httpOnly: true,
         secure: true
@@ -129,8 +131,8 @@ const loginUser = asyncHandler(async (req, res) => {
     // we sent cookie as well as json coz of users different functionality what if they wanna build some mobile apps so they cant have cookie in that case
     return res
         .status(200)
-        .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
+        .cookie("accessToken", accessToken, options)   //key and value of acesssToken
+        .cookie("refreshToken", refreshToken, options)  //key and value of refreshToken
         .json(
             new ApiResponse(
                 200,
@@ -144,7 +146,7 @@ const loginUser = asyncHandler(async (req, res) => {
 })
 
 const logoutUser = asyncHandler(async (req, res) => {
-    User.findByIdAndUpdate(
+    User.findByIdAndUpdate(   //how to find the user and then what to update, that is given by $set
         req.user._id,
         {
             $set: {
@@ -155,22 +157,62 @@ const logoutUser = asyncHandler(async (req, res) => {
             new: true //get the new value stored in db now 
         }
     )
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged out"))
+
+
 })
 
-const options = {
-    httpOnly: true,
-    secure: true
+const refreshAccessToken = asyncHandler(async (req, res) => {
+    const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+
+    if (!incomingRefreshToken) {
+        throw new ApiError(401, "Unauthorized request")
+    }
+try {
+        const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+    
+        const user = User.findById(decodedToken?._id)
+    
+        if (!user) {
+            throw new ApiError(401, "Invalid refresh token")
+        }
+    
+        if(incomingRefreshToken !== user?.refreshToken){
+            throw new ApiError(401 , "Refresh token is expired")
+        }
+    
+        const options = {
+            httpOnly: true,
+            secure : true
+        }
+    
+        const { accessToken, refreshToken : newRefreshToken} = await generateAccessAndRefreshToken(user._id);
+    
+        return res
+        .status(200)
+        .cookie("accessToken" , accessToken , options)
+        .cookie("newRefreshToken" , newRefreshToken , options)
+        .json(new ApiResponse(200 , {accessToken , newRefreshToken}, "Access token refreshed"))
+    
+} catch (error) {
+    throw new ApiError(401 , error?.message || "Invalid request")
 }
 
-return res
-    .status(200)
-    .clearCookie("accessToken", options)
-    .clearCookie("refreshToken", options)
-    .json(new ApiResponse(200, {}, "User logged out"))
-
+})
 
 export {
     registerUser,
     loginUser,
-    logoutUser
+    logoutUser,
+    refreshAccessToken
 }

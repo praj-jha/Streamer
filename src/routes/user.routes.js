@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { loginUser, logoutUser, registerUser } from "../controllers/user.controller.js";
+import { loginUser, logoutUser, refreshAccessToken, registerUser } from "../controllers/user.controller.js";
 import { fileUpload } from "../middlewares/fileUpload.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
@@ -14,12 +14,13 @@ router.route("/user")
     
     And then i sent the req to the controller which is registerUser and in between i checked
     for the file upload as per multer*/
-    
+
 const router = Router();
 router.route("/register").post( fileUpload,
     registerUser)
 
     router.route("/login").post(loginUser);
     router.route("/logout").post(verifyJWT,logoutUser);
+    router.route("/refresh-token").post(refreshAccessToken)
 
 export default router;

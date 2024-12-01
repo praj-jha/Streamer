@@ -10,7 +10,7 @@ app.use(cors({
 }))
 
 app.use(express.json({limit: "16kb"}))
-app.use(express.urlencoded({extended: true , limit : "16kb"})) //checks for data coming from url in different forms like some has % or some has +
+app.use(express.urlencoded({extended: true , limit : "16kb"})) //checks for data coming from url that for spaces some add + or %20 or to encod that and give the right data
 app.use(express.static("public"))
 app.use(cookieParser())  //can access the cookies stored in users browser and can do something with them
 
