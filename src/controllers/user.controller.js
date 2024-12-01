@@ -236,12 +236,38 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, req.user, "Current user fetched"))
 })
 
-const updateOtherFields = asyncHandler(async (req, res) => {
+const updateNameAndEmail = asyncHandler(async (req, res) => {
     const { fullname, email } = req.body
-    const user = User.findById(req.user._id)
-    user.fullname = fullname
-    user.email = email
-    await user.save({validateBeforeSave : false})
+    if (!fullname && !email) {
+        return res.status(404).json(new ApiError(404, "Atleast one of fullname or email is required"));
+    }
+    const user = await User.findById(req.user._id)  //finding the user through its _id from auth middleware
+    if (!user) {
+        return res.status(404).json(new ApiResponse(404, null, "User not found"));
+    }
+    //check if the user from this email already exists with any other user provided user sends the email to update
+    if (email !== undefined) {
+        const duplicateEmailEntry = await User.findOne({ email })
+        if (duplicateEmailEntry && duplicateEmailEntry._id.toString() !== user._id.toString()) {
+            return res.status(503).json(new ApiError(500, "Email is already in use by another user"));
+        }
+    }
+
+    if (fullname !== undefined && fullname !== user.fullname) {
+        user.fullname = fullname
+    }
+    if (email !== undefined && email !== user.email) {
+        user.email = email
+    }
+
+    try {
+        await user.save({ validateBeforeSave: false })
+        return res
+            .status(200)
+            .json(new ApiResponse(200, { fullname, email }, "Your name and email are updated"))
+    } catch (error) {
+        return res.status(503).json(new ApiError(503, "Some error while updating the values"));
+    }
 
 })
 
@@ -252,5 +278,5 @@ export {
     refreshAccessToken,
     changeCurrentPassword,
     getCurrentUser,
-    updateOtherFields
+    updateNameAndEmail
 }
