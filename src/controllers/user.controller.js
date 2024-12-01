@@ -146,7 +146,7 @@ const loginUser = asyncHandler(async (req, res) => {
 })
 
 const logoutUser = asyncHandler(async (req, res) => {
-    User.findByIdAndUpdate(   //how to find the user and then what to update, that is given by $set
+    User.findByIdAndUpdate(   //how to find the user and then what to update, that is given by $set (mongodb operator)
         req.user._id,
         {
             $set: {
@@ -178,35 +178,70 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     if (!incomingRefreshToken) {
         throw new ApiError(401, "Unauthorized request")
     }
-try {
+    try {
         const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
-    
+
         const user = User.findById(decodedToken?._id)
-    
+
         if (!user) {
             throw new ApiError(401, "Invalid refresh token")
         }
-    
-        if(incomingRefreshToken !== user?.refreshToken){
-            throw new ApiError(401 , "Refresh token is expired")
+
+        if (incomingRefreshToken !== user?.refreshToken) {
+            throw new ApiError(401, "Refresh token is expired")
         }
-    
+
         const options = {
             httpOnly: true,
-            secure : true
+            secure: true
         }
-    
-        const { accessToken, refreshToken : newRefreshToken} = await generateAccessAndRefreshToken(user._id);
-    
+
+        const { accessToken, refreshToken: newRefreshToken } = await generateAccessAndRefreshToken(user._id);
+
         return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("newRefreshToken", newRefreshToken, options)
+            .json(new ApiResponse(200, { accessToken, newRefreshToken }, "Access token refreshed"))
+
+    } catch (error) {
+        throw new ApiError(401, error?.message || "Invalid request")
+    }
+
+})
+
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.body
+
+    const user = await User.findById(req.user?._id);
+    const isPaswordCorrect = await user.isPasswordCorrect(oldPassword);
+
+    if (!isPaswordCorrect) {
+        throw new ApiError
+    }
+
+    user.password = newPassword
+    await user.save({ validateBeforeSave: false })   //this will trigger the pre save hook but apart from it all other validations are turned off
+
+    return res
         .status(200)
-        .cookie("accessToken" , accessToken , options)
-        .cookie("newRefreshToken" , newRefreshToken , options)
-        .json(new ApiResponse(200 , {accessToken , newRefreshToken}, "Access token refreshed"))
-    
-} catch (error) {
-    throw new ApiError(401 , error?.message || "Invalid request")
-}
+        .json(new ApiResponse(200, {}, "Password changed successfully"))
+
+
+})
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res
+        .status(200)
+        .json(new ApiResponse(200, req.user, "Current user fetched"))
+})
+
+const updateOtherFields = asyncHandler(async (req, res) => {
+    const { fullname, email } = req.body
+    const user = User.findById(req.user._id)
+    user.fullname = fullname
+    user.email = email
+    await user.save({validateBeforeSave : false})
 
 })
 
@@ -214,5 +249,8 @@ export {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateOtherFields
 }
