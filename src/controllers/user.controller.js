@@ -1,7 +1,6 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js"
-import { uploadonCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 
@@ -48,7 +47,7 @@ const registerUser = asyncHandler(async (req, res) => {
     })
 
     if (existingUser) {
-        throw new ApiError(409, "User already exists")
+        throw new ApiError(409, "User already exists");
     }
 
     const avatarLocalPath = req.files?.avatar[0]?.path;
@@ -58,15 +57,11 @@ const registerUser = asyncHandler(async (req, res) => {
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar field required")
     }
-
-
     const avatar = await uploadonCloudinary(avatarLocalPath)
     const coverImage = await uploadonCloudinary(coverImageLocalPath)
-
     if (!avatar) {
         throw new ApiError(400, "Avatar file is required")
     }
-
 
     const user = await User.create({
         fullname,
@@ -82,14 +77,13 @@ const registerUser = asyncHandler(async (req, res) => {
     fullname and username were also not req in the createdUser then we couldve written it like 
     .select("-password -fullname -username") */
     const createdUser = await User.findById(user._id).select(
-        "-password"
+        "-password -refreshToken"
     )
 
 
     if (!createdUser) {
         throw new ApiError(500, "Something went wrong while registering the user")
     }
-
 
     return res.status(201).json(
         new ApiResponse(200, createdUser, "User registered successfully")
@@ -119,7 +113,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
-    const loggedInUser = User.findById(user._id).select("-password -refreshToken");
+    const loggedInUser =await User.findById(user._id).select("-password -refreshToken");
 
     //this needs to added coz after then the cookie can only be changed by the server side not by the user
     const options = {
