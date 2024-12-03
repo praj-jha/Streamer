@@ -2,6 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { uploadonCloudinary } from "../utils/cloudinary.js";
 
 
 const generateAccessAndRefreshToken = async function (userId) {
@@ -247,6 +248,8 @@ const updateNameAndEmail = asyncHandler(async (req, res) => {
         }
     }
 
+    //need to test this code for lets say when the user sends the space as a fullname or email that validation i dont see
+
     if (fullname !== undefined && fullname !== user.fullname) {
         user.fullname = fullname
     }
@@ -265,6 +268,49 @@ const updateNameAndEmail = asyncHandler(async (req, res) => {
 
 })
 
+const updateUserAvatar = asyncHandler(async(req , res)=>{
+    const avatarLocalPath = req.file?.path
+
+    if(!avatarLocalPath){
+        throw new ApiError
+    }
+
+    const avatar = uploadonCloudinary(avatarLocalPath)
+
+    if(!avatar.url){}
+
+    const user = User.findByIdAndUpdate(
+        req.user?._id,
+        {$set :{
+            avatar : avatar.url
+        }},
+        {new : true}
+    )
+})
+const updateCoverImage = asyncHandler(async(req , res)=>{
+    const coverImageLocalPath = req.file?.path
+
+    if(!coverImageLocalPath){
+        throw new ApiError
+    }
+
+    const coverImage = uploadonCloudinary(coverImageLocalPath)
+
+    if(!avatar.url){}
+
+    const user = User.findByIdAndUpdate(
+        req.user?._id,
+        {$set :{
+            coverImage : coverImage.url
+        }},
+        {new : true}
+    ).select("-password")
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200 , user , "User coverImage updated successfully"))
+})
+
 export {
     registerUser,
     loginUser,
@@ -272,5 +318,7 @@ export {
     refreshAccessToken,
     changeCurrentPassword,
     getCurrentUser,
-    updateNameAndEmail
+    updateNameAndEmail,
+    updateCoverImage,
+    updateUserAvatar
 }
