@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { uploadonCloudinary } from "../utils/cloudinary.js";
+import mongoose from "mongoose";
 
 
 const generateAccessAndRefreshToken = async function (userId) {
@@ -114,7 +115,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
-    const loggedInUser =await User.findById(user._id).select("-password -refreshToken");
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
     //this needs to added coz after then the cookie can only be changed by the server side not by the user
     const options = {
@@ -268,47 +269,167 @@ const updateNameAndEmail = asyncHandler(async (req, res) => {
 
 })
 
-const updateUserAvatar = asyncHandler(async(req , res)=>{
+const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
 
-    if(!avatarLocalPath){
+    if (!avatarLocalPath) {
         throw new ApiError
     }
 
     const avatar = uploadonCloudinary(avatarLocalPath)
 
-    if(!avatar.url){}
+    if (!avatar.url) { }
 
     const user = User.findByIdAndUpdate(
         req.user?._id,
-        {$set :{
-            avatar : avatar.url
-        }},
-        {new : true}
+        {
+            $set: {
+                avatar: avatar.url
+            }
+        },
+        { new: true }
     )
 })
-const updateCoverImage = asyncHandler(async(req , res)=>{
+const updateCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file?.path
 
-    if(!coverImageLocalPath){
+    if (!coverImageLocalPath) {
         throw new ApiError
     }
 
-    const coverImage = uploadonCloudinary(coverImageLocalPath)
+    const coverImage = await uploadonCloudinary(coverImageLocalPath)
 
-    if(!avatar.url){}
+    if (!avatar.url) { }
 
-    const user = User.findByIdAndUpdate(
+    const user = await User.findByIdAndUpdate(
         req.user?._id,
-        {$set :{
-            coverImage : coverImage.url
-        }},
-        {new : true}
+        {
+            $set: {
+                coverImage: coverImage.url
+            }
+        },
+        { new: true }
     ).select("-password")
 
     return res
-    .status(200)
-    .json(new ApiResponse(200 , user , "User coverImage updated successfully"))
+        .status(200)
+        .json(new ApiResponse(200, user, "User coverImage updated successfully"))
+})
+
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+    const { username } = req.params   //gets the username from the url which happens aactually on the youtube
+
+    if (!username?.trim()) {
+        throw new ApiError
+    }
+    const channel = await User.aggregate([{
+        $match: {   //searching for that usrname from the db which we got from the user
+            username: username?.toLowerCase()
+        },
+
+    },
+    {
+        $lookup: {   //it is used to join two documents
+            from: "subscription",
+            localField: "_id",
+            foreignField: "channel",
+            as: "Subscribers"
+        }
+    },
+    {
+        $lookup: {
+            from: "subscription",
+            localField: "_id",
+            foreignField: "subscriber",
+            as: "SubscribedTo"
+        }
+    },
+    {
+        $addFields: {
+            subscribersCount: {
+                $size: "$Subscribers"
+            },
+            channelsSubscriberToCount: {
+                $size: "$SubscribedTo"
+            },
+            isSubscribed: {
+                $cond: {
+                    if: { $in: [req.user?._id, "$Subscribers.subscriber"] },
+                    then: true,
+                    else: false
+                }
+            }
+        }
+    },
+    {
+        $project: {
+            fullname: 1,
+            username: 1,
+            subscribersCount: 1,
+            channelsSubscriberToCount: 1,
+            isSubscribed: 1,
+            avatar: 1,
+            coverImage: 1,
+            email: 1
+        }
+    }
+
+    ])
+    if (!channel?.length) {
+        throw new ApiError(404, "Channel does not exist")
+    }
+    return res
+        .status(200)
+        .json(new ApiResponse, channel[0], "User channel")
+})
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+    const user = await User.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        fullname: 1,
+                                        username: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields: {
+                            owner: {
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    res.status(200)
+    .json(new ApiResponse(
+        200 , user[0].watchHistory , "Watch history fetched successfully"
+    ))
 })
 
 export {
@@ -320,5 +441,7 @@ export {
     getCurrentUser,
     updateNameAndEmail,
     updateCoverImage,
-    updateUserAvatar
+    updateUserAvatar,
+    getUserChannelProfile,
+    getWatchHistory
 }
