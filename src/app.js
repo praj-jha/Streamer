@@ -16,7 +16,9 @@ app.use(cookieParser())  //can access the cookies stored in users browser and ca
 
 
 import userRouter from './routes/user.routes.js'
+import videoUploadRouter from './routes/videoUpload.routes.js'
 
 
 app.use("/api/v1/users" , userRouter)
+app.use("/api/v1/upload" , videoUploadRouter)
 export {app}

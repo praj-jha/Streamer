@@ -54,7 +54,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const avatarLocalPath = req.files?.avatar[0]?.path;
 
-    const coverImageLocalPath = req.files?.coverImage?.[0]?.path || "";
+    const coverImageLocalPath = req.files?.coverImage?.[0]?.path || "";  //this '.' before [0] is how chaining works in js for arrays we got to put that ?. together
 
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar field required")
