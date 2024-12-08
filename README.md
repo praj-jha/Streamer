@@ -1,5 +1,5 @@
 # **Streamer**  
-A comprehensive video streaming platform offering features similar to YouTube, allowing users to upload, watch, and engage with videos. Streamer brings creators and audiences closer through cutting-edge tools, seamless content delivery, and a vibrant community.  
+A video streaming platform offering features similar to YouTube, allowing users to upload, watch, and engage with videos. 
 
 ---
 
